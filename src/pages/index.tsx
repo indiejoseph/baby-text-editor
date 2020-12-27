@@ -1,8 +1,10 @@
 import { Textarea } from '@rebass/forms';
+import toHex from 'colornames';
 import emoji from 'emoji-dictionary';
 import { NextPage } from 'next';
 import React from 'react';
 import styled from 'styled-components';
+import useFitText from 'use-fit-text';
 import { colors } from '../styles';
 
 const word2Shapes = new Map([
@@ -17,6 +19,11 @@ const word2Shapes = new Map([
   ['heart', '♥'],
 ]);
 
+const colornames = toHex
+  .all()
+  .filter(color => color.css)
+  .map(color => color.name);
+
 const Container = styled.div`
   width: 100vw;
   height: 100vh;
@@ -24,7 +31,6 @@ const Container = styled.div`
 
 const StyledTextarea = styled(Textarea)`
   && {
-    display: block;
     position: absolute;
     margin: 0;
     border: 0;
@@ -34,7 +40,7 @@ const StyledTextarea = styled(Textarea)`
     border-radius: 0;
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
-    overflow: auto;
+    overflow: none;
     resize: none;
     color: white;
     outline: none;
@@ -52,7 +58,7 @@ const StyledTextarea = styled(Textarea)`
 const Backdrop = styled.div`
   position: absolute;
   background-color: transparent;
-  overflow: auto;
+  overflow: none;
   pointer-events: none;
   width: 100%;
   height: 100%;
@@ -65,8 +71,12 @@ const Highlights = styled.div`
   white-space: pre-wrap;
   word-wrap: break-word;
   text-align: center;
+  width: 100%;
+  height: 100%;
+  color: white;
 
   mark {
+    transition: color 300ms linear;
     background-color: transparent;
     color: white;
 
@@ -115,18 +125,9 @@ const Highlights = styled.div`
 const IndexPage: NextPage = () => {
   const [value, setValue] = React.useState<string>('Hello World');
   const [text, setText] = React.useState<string>('Hello World');
-  const [fontSize, setFontSize] = React.useState<string>('3em');
   const textareaRef = React.useRef<HTMLTextAreaElement>();
+  const { fontSize, ref: highlightsRef } = useFitText({ maxFontSize: 1000, resolution: 2 });
   const backdropRef = React.useRef<HTMLDivElement>() as React.MutableRefObject<HTMLDivElement>;
-  const defaultFontSize = 24;
-
-  function getFontSize() {
-    const w =
-      window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-    const size = Math.min(10, Math.max(1, w / defaultFontSize / 4));
-
-    return size;
-  }
 
   function speak(chars: string) {
     if (chars) {
@@ -140,57 +141,60 @@ const IndexPage: NextPage = () => {
     }
   }
 
-  function handleResize() {
-    const newFontSize = getFontSize();
-
-    setFontSize(`${newFontSize}em`);
-  }
-
   function applyHighlights(txt: string) {
-    return txt.replace(/\n$/g, '\n\n').replace(/.{1}/g, '<mark>$&</mark>');
+    let highlights = txt
+      .replace(/\n$/g, '\n\n')
+      .replace(/(\w+|\d+|\u25A0-\u25FF)/g, '<mark>$&</mark>');
+    const words = highlights.split(/<mark>([^<]+)<\/mark>/).filter(p => !!p && p !== ' ');
+
+    words.forEach(word => {
+      const color = toHex(word.toLowerCase());
+
+      if (colornames.indexOf(word.toLowerCase()) === -1 || !color) {
+        return;
+      }
+
+      highlights = highlights.replace(
+        new RegExp(`<mark>${word}</mark>`),
+        `<mark style="color: ${color}">${word}</mark>`
+      );
+    });
+
+    return highlights;
   }
 
   const handleOnChange: React.ChangeEventHandler<HTMLTextAreaElement> = event => {
-    const { data } = event.nativeEvent as any;
     let rawText = event.currentTarget.value;
+    const lastWordMatchArray = /(:?\w+)\s$/.exec(rawText);
+    let word = '';
 
-    // speak the work if detected space otherwise speak the character only
-    if (data !== ' ') {
-      speak(data);
-    } else {
-      const lastWordMatchArray = /(:?\w+)\s$/.exec(rawText);
-      let word = '';
+    // check is it emoji(with colon prefix)
+    if (lastWordMatchArray) {
+      [, word] = lastWordMatchArray;
 
-      // check is it emoji(with colon prefix)
-      if (lastWordMatchArray) {
-        [, word] = lastWordMatchArray;
+      // detect prefix colon for emoji or shapes
+      if (/^:/.test(word)) {
+        const normalizedWord = word.replace(/^:/, '');
 
-        if (/^:/.test(word)) {
-          const normalizedWord = word.replace(/^:/, '');
+        if (word2Shapes.has(normalizedWord)) {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          rawText = rawText.replace(new RegExp(`${word} $`), word2Shapes.get(normalizedWord)!);
+          word = word.replace(/(-|_|:)/g, ' '); // remove non word characters for better tts
+        } else {
+          console.log(normalizedWord);
 
-          console.log(word2Shapes.has(normalizedWord));
+          const emojiChar: string = emoji.getUnicode(normalizedWord);
 
-          if (word2Shapes.has(normalizedWord)) {
-            console.log(word2Shapes.has(normalizedWord));
-
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            rawText = rawText.replace(new RegExp(`${word} $`), word2Shapes.get(normalizedWord)!);
+          if (emojiChar) {
+            rawText = rawText.replace(new RegExp(`${word} $`), emojiChar);
             word = word.replace(/(-|_|:)/g, ' '); // remove non word characters for better tts
-          } else {
-            // prefix colon for emoji
-            const emojiChar: string = emoji.getUnicode(normalizedWord);
-
-            if (emojiChar) {
-              rawText = rawText.replace(new RegExp(`${word} $`), emojiChar);
-              word = word.replace(/(-|_|:)/g, ' '); // remove non word characters for better tts
-            }
           }
         }
       }
+    }
 
-      if (word) {
-        speak(word);
-      }
+    if (word) {
+      speak(word);
     }
 
     const highlights = applyHighlights(rawText);
@@ -215,30 +219,14 @@ const IndexPage: NextPage = () => {
   React.useEffect(() => {
     const textareaValue = textareaRef.current ? textareaRef.current.value : '';
 
-    handleResize();
     setText(applyHighlights(textareaValue));
   }, [setText]);
-
-  // Window resize listener
-  React.useEffect(() => {
-    window.addEventListener('resize', handleResize);
-
-    // Call handler right away so state gets updated with initial window size
-    handleResize();
-
-    // Remove event listener on cleanup
-    return () => window.removeEventListener('resize', handleResize);
-  }, [setFontSize]);
-
-  // Monitor text change
-  React.useEffect(() => {
-    handleResize();
-  }, [value]);
 
   return (
     <Container>
       <Backdrop ref={backdropRef}>
         <Highlights
+          ref={highlightsRef}
           dangerouslySetInnerHTML={{ __html: text }}
           style={{
             fontSize,
