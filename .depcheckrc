@@ -1,0 +1,16 @@
+{
+  "ignores": [
+    "eslint",
+    "eslint-*",
+    "jest",
+    "jest-*",
+    "@types/*",
+    "@commitlint/*",
+    "husky"
+  ],
+  "ignoreDirs": [
+    "node_modules"
+  ],
+  "strict": true,
+  "unused": true
+}

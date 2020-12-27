@@ -1,0 +1,12 @@
+node_modules
+**/lib
+**/node_modules
+**/dist
+**/.DS_Store
+**/.next
+**/static
+storybook/static
+.vscode
+.next
+static
+*.d.ts
