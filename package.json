@@ -23,12 +23,12 @@
     "React",
     "Nextjs"
   ],
-  "author": "Joseph Cheng <joseph.cheng@youevercare.com>",
+  "author": "Joseph Cheng <indiejoseph@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/EvercareTeam/ts-starter/issues"
+    "url": "https://github.com/indiejoseph/baby-text-editor/issues"
   },
-  "homepage": "https://github.com/EvercareTeam/ts-starter#readme",
+  "homepage": "https://github.com/indiejoseph/baby-text-editor#readme",
   "dependencies": {
     "@rebass/forms": "4.0.6",
     "@rebass/preset": "4.0.5",
