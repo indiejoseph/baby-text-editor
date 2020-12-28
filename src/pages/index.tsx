@@ -123,8 +123,8 @@ const Highlights = styled.div`
 `;
 
 const IndexPage: NextPage = () => {
-  const [value, setValue] = React.useState<string>('Hello World');
-  const [text, setText] = React.useState<string>('Hello World');
+  const [value, setValue] = React.useState<string>('Hello Baby');
+  const [text, setText] = React.useState<string>('Hello Baby');
   const textareaRef = React.useRef<HTMLTextAreaElement>();
   const { fontSize, ref: highlightsRef } = useFitText({ maxFontSize: 1000, resolution: 2 });
   const backdropRef = React.useRef<HTMLDivElement>() as React.MutableRefObject<HTMLDivElement>;
@@ -133,18 +133,24 @@ const IndexPage: NextPage = () => {
     if (chars) {
       const utterance = new SpeechSynthesisUtterance(chars.toLowerCase());
       const voices = window.speechSynthesis.getVoices();
+      let voice = voices[0];
+      const googleFemaleVoice = voices.find(({ name }) => name === 'Google US English'); // more natural
+      const samanthaVoice = voices.find(({ name }) => name === 'Samantha'); // I like Samantha's voice
 
-      // eslint-disable-next-line prefer-destructuring
-      utterance.voice = voices[48];
+      if (googleFemaleVoice) {
+        voice = googleFemaleVoice;
+      } else if (samanthaVoice) {
+        voice = samanthaVoice;
+      }
+
+      utterance.voice = voice;
 
       speechSynthesis.speak(utterance);
     }
   }
 
   function applyHighlights(txt: string) {
-    let highlights = txt
-      .replace(/\n$/g, '\n\n')
-      .replace(/(\w+|\d+|\u25A0-\u25FF)/g, '<mark>$&</mark>');
+    let highlights = txt.replace(/\n$/g, '\n\n').replace(/(\w+|\d+|.)/g, '<mark>$&</mark>');
     const words = highlights.split(/<mark>([^<]+)<\/mark>/).filter(p => !!p && p !== ' ');
 
     words.forEach(word => {

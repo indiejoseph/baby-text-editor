@@ -1,6 +1,6 @@
 {
   "name": "baby-text-editor",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A text editor for baby",
   "main": "index.js",
   "scripts": {
