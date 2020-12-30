@@ -40,7 +40,6 @@ const StyledTextarea = styled(Textarea)`
     border-radius: 0;
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
-    overflow: none;
     resize: none;
     color: white;
     outline: none;
@@ -58,7 +57,7 @@ const StyledTextarea = styled(Textarea)`
 const Backdrop = styled.div`
   position: absolute;
   background-color: transparent;
-  overflow: none;
+  overflow: auto;
   pointer-events: none;
   width: 100%;
   height: 100%;
