@@ -1,23 +1,11 @@
 import { Textarea } from '@rebass/forms';
 import toHex from 'colornames';
 import emoji from 'emoji-dictionary';
-import { NextPage } from 'next';
+import { GetStaticProps, NextPage } from 'next';
 import React from 'react';
 import styled from 'styled-components';
-import useFitText from 'use-fit-text';
+import { useSetTimeout } from '../hooks/use-settimeout';
 import { colors } from '../styles';
-
-const word2Shapes = new Map([
-  ['triangle', '▲'],
-  ['square', '■'],
-  ['circle', '●'],
-  ['parallelogram', '▰'],
-  ['diamond', '◆'],
-  ['oval', '⬬'],
-  ['rectangle', '▮'],
-  ['semi-circle', '◖'],
-  ['heart', '♥'],
-]);
 
 const colornames = toHex
   .all()
@@ -29,6 +17,8 @@ const Container = styled.div`
   height: 100vh;
 `;
 
+const FONT_SIZE = '88px';
+
 const StyledTextarea = styled(Textarea)`
   && {
     position: absolute;
@@ -36,21 +26,33 @@ const StyledTextarea = styled(Textarea)`
     border: 0;
     width: 100%;
     height: 100%;
-    text-align: center;
+    text-align: left;
     border-radius: 0;
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
     resize: none;
+    font-size: ${FONT_SIZE};
     color: white;
     outline: none;
     padding: 2rem;
     text-shadow: 0px 0px 0px transparent;
     -webkit-text-fill-color: transparent;
+    z-index: 2;
+
+    // hiding scroll bar
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      width: 0px;
+      background: transparent; /* Chrome/Safari/Webkit */
+    }
   }
 
   &::selection {
     background-color: ${colors.orange};
-    color: white;
+    color: white !important;
+    text-shadow: none;
   }
 `;
 
@@ -58,26 +60,51 @@ const Backdrop = styled.div`
   position: absolute;
   background-color: transparent;
   overflow: auto;
-  pointer-events: none;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   outline: none;
   padding: 2rem;
-  z-index: 2;
+  z-index: 1;
 `;
 
-const Highlights = styled.div`
+interface HighlightsProps {
+  shadow?: boolean;
+}
+
+const Highlights = styled.div<HighlightsProps>`
+  position: relative;
   white-space: pre-wrap;
   word-wrap: break-word;
-  text-align: center;
+  text-align: left;
   width: 100%;
-  height: 100%;
   color: white;
+  font-size: ${FONT_SIZE};
+  overflow: auto;
+
+  // hiding scroll bar
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    width: 0px;
+    background: transparent; /* Chrome/Safari/Webkit */
+  }
 
   mark {
-    transition: color 300ms linear;
+    transition: ${(props: HighlightsProps) =>
+      (props as any).shadow ? 'none' : 'all 100ms ease-out'};
     background-color: transparent;
     color: white;
+    opacity: 0;
+
+    &.highlight {
+      border-radius: 12px;
+      background-color: rgba(255, 255, 255, 0.15);
+    }
+
+    &.ready {
+      opacity: 1;
+    }
 
     &:nth-child(10n + 1) {
       color: ${colors.orange};
@@ -123,55 +150,66 @@ const Highlights = styled.div`
 
 const IndexPage: NextPage = () => {
   const [value, setValue] = React.useState<string>('Hello Baby');
-  const [text, setText] = React.useState<string>('Hello Baby');
   const textareaRef = React.useRef<HTMLTextAreaElement>();
-  const { fontSize, ref: highlightsRef } = useFitText({ maxFontSize: 1000, resolution: 2 });
+  const highlightsRef = React.useRef<HTMLDivElement>();
   const backdropRef = React.useRef<HTMLDivElement>() as React.MutableRefObject<HTMLDivElement>;
+  const [timeout] = useSetTimeout();
 
   function speak(chars: string) {
-    if (chars) {
-      const utterance = new SpeechSynthesisUtterance(chars.toLowerCase());
-      const voices = window.speechSynthesis.getVoices();
-      let voice = voices[0];
-      const googleFemaleVoice = voices.find(({ name }) => name === 'Google US English'); // more natural
-      const samanthaVoice = voices.find(({ name }) => name === 'Samantha'); // I like Samantha's voice
+    window.speechSynthesis.cancel();
 
-      if (googleFemaleVoice) {
-        voice = googleFemaleVoice;
-      } else if (samanthaVoice) {
-        voice = samanthaVoice;
+    timeout(300).then(() => {
+      if (chars) {
+        const utterance = new SpeechSynthesisUtterance(chars.toLowerCase());
+        const voices = window.speechSynthesis.getVoices();
+        let voice = voices[0];
+        const googleFemaleVoice = voices.find(({ name }) => name === 'Google US English'); // more natural
+        const samanthaVoice = voices.find(({ name }) => name === 'Samantha'); // I like Samantha's voice
+
+        if (googleFemaleVoice) {
+          voice = googleFemaleVoice;
+        } else if (samanthaVoice) {
+          voice = samanthaVoice;
+        }
+
+        utterance.voice = voice;
+
+        window.speechSynthesis.speak(utterance);
       }
-
-      utterance.voice = voice;
-
-      speechSynthesis.speak(utterance);
-    }
+    });
   }
 
   function applyHighlights(txt: string) {
-    let highlights = txt.replace(/\n$/g, '\n\n').replace(/(\w+|\d+|.)/g, '<mark>$&</mark>');
-    const words = highlights.split(/<mark>([^<]+)<\/mark>/).filter(p => !!p && p !== ' ');
+    const highlights = txt.replace(/\n$/g, '\n\n').split(/([-a-z0-9]+)/gi);
 
-    words.forEach(word => {
-      const color = toHex(word.toLowerCase());
+    return (
+      <>
+        {highlights.map((word, i) => {
+          const color = toHex(word.toLowerCase());
 
-      if (colornames.indexOf(word.toLowerCase()) === -1 || !color) {
-        return;
-      }
+          if (colornames.indexOf(word.toLowerCase()) !== -1 && color) {
+            return (
+              <mark style={{ color }} key={i.toString()}>
+                {word}
+              </mark>
+            );
+          }
 
-      highlights = highlights.replace(
-        new RegExp(`<mark>${word}</mark>`),
-        `<mark style="color: ${color}">${word}</mark>`
-      );
-    });
-
-    return highlights;
+          return <mark key={i.toString()}>{word}</mark>;
+        })}
+      </>
+    );
   }
 
-  const handleOnChange: React.ChangeEventHandler<HTMLTextAreaElement> = event => {
+  const handleOnChange: React.ChangeEventHandler<HTMLTextAreaElement> = async event => {
     let rawText = event.currentTarget.value;
+    const char = (event.nativeEvent as any).data;
     const lastWordMatchArray = /(:?\w+)\s$/.exec(rawText);
     let word = '';
+
+    if (char) {
+      speak(char);
+    }
 
     // check is it emoji(with colon prefix)
     if (lastWordMatchArray) {
@@ -179,33 +217,38 @@ const IndexPage: NextPage = () => {
 
       // detect prefix colon for emoji or shapes
       if (/^:/.test(word)) {
-        const normalizedWord = word.replace(/^:/, '');
+        const emojiChar: string = emoji.getUnicode(word);
 
-        if (word2Shapes.has(normalizedWord)) {
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          rawText = rawText.replace(new RegExp(`${word} $`), word2Shapes.get(normalizedWord)!);
+        if (emojiChar) {
+          rawText = rawText.replace(new RegExp(`${word} $`), emojiChar);
           word = word.replace(/(-|_|:)/g, ' '); // remove non word characters for better tts
-        } else {
-          console.log(normalizedWord);
-
-          const emojiChar: string = emoji.getUnicode(normalizedWord);
-
-          if (emojiChar) {
-            rawText = rawText.replace(new RegExp(`${word} $`), emojiChar);
-            word = word.replace(/(-|_|:)/g, ' '); // remove non word characters for better tts
-          }
         }
       }
     }
 
-    if (word) {
+    if (word && word.length > 1) {
       speak(word);
     }
 
-    const highlights = applyHighlights(rawText);
-
     setValue(rawText);
-    setText(highlights);
+  };
+
+  const handleOnClick: React.MouseEventHandler<HTMLTextAreaElement> = evt => {
+    const elements = document.elementsFromPoint(evt.pageX, evt.pageY);
+    const marks = (highlightsRef && highlightsRef.current
+      ? highlightsRef.current.querySelectorAll('mark')
+      : []) as NodeListOf<HTMLDivElement>;
+    const clickedMark = elements.find(elm => elm.tagName === 'MARK');
+
+    // remove class name `highlight` from all <mark/>
+    marks.forEach(mark => {
+      mark.classList.remove('highlight');
+    });
+
+    if (clickedMark) {
+      speak(clickedMark.innerHTML);
+      clickedMark.classList.add('highlight');
+    }
   };
 
   const handleOnScroll: React.WheelEventHandler<HTMLTextAreaElement> = () => {
@@ -222,36 +265,51 @@ const IndexPage: NextPage = () => {
 
   // Initialize
   React.useEffect(() => {
-    const textareaValue = textareaRef.current ? textareaRef.current.value : '';
+    // trick to pre-load voices
+    speak(' ');
+  }, []);
 
-    setText(applyHighlights(textareaValue));
-  }, [setText]);
+  // Text changes
+  React.useEffect(() => {
+    // add class name to all mark in order to trigger transitions
+    if (!highlightsRef || !highlightsRef.current) {
+      return;
+    }
+
+    const marks = highlightsRef.current.querySelectorAll('mark');
+
+    marks.forEach(mark => {
+      if (!mark.classList.contains('ready')) {
+        mark.classList.add('ready');
+      }
+    });
+  }, [value]);
 
   return (
     <Container>
       <Backdrop ref={backdropRef}>
-        <Highlights
-          ref={highlightsRef}
-          dangerouslySetInnerHTML={{ __html: text }}
-          style={{
-            fontSize,
-          }}
-        />
+        <Highlights ref={highlightsRef as React.RefObject<HTMLDivElement>}>
+          {applyHighlights(value)}
+        </Highlights>
       </Backdrop>
       <StyledTextarea
         ref={textareaRef}
         onChange={handleOnChange}
         onScroll={handleOnScroll}
+        onClick={handleOnClick}
         value={value}
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck="false"
-        sx={{
-          fontSize,
-        }}
       />
     </Container>
   );
+};
+
+export const getStaticProps: GetStaticProps = async () => {
+  return {
+    props: {},
+  };
 };
 
 export default IndexPage;
