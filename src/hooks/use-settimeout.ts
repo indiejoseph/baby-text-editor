@@ -11,8 +11,6 @@ export const useSetTimeout = (thread = 1) => {
     return new Promise<SetTimeoutReturnType>(resolve => {
       setTimeoutId(() => {
         const newTimeoutId: SetTimeoutReturnType = setTimeout(() => {
-          console.log('new', newTimeoutId);
-
           resolve(newTimeoutId!);
         }, ms);
 
